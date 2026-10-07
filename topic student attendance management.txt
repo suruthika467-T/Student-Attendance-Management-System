@@ -1,0 +1,900 @@
+topic: student attendance management system
+
+attendance_system/
+│
+├── main.py                # Login + Dashboard
+├── students.py            # Student CRUD module
+├── courses.py             # Course CRUD module
+├── enrollments.py         # Assign students to courses
+├── attendance.py          # Mark and view attendance
+├── reports.py             # Attendance % & defaulters report
+├── db_connection.py       # DB connection functions
+├── schema.sql             # Table creation SQL
+├── sample_data.sql        # Sample students, courses, enrollments
+
+main.py
+import customtkinter as ctk
+from tkinter import messagebox
+import os
+ 
+class Dashboard(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Attendance Management System")
+        self.geometry("900x600")
+        self.configure(fg_color="#0b253e")  # Keep your original background color
+
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+
+        self.create_widgets()
+
+    # ======================================================
+    # Create all buttons
+    # ======================================================
+    def create_widgets(self):
+        title_label = ctk.CTkLabel(
+            self,
+            text="📘 Attendance Management System",
+            font=("Arial Rounded MT Bold", 28),
+            text_color="white",
+        )
+        title_label.pack(pady=40)
+
+        button_frame = ctk.CTkFrame(self, fg_color="#0b253e")
+        button_frame.pack(pady=30)
+
+        # --- Buttons ---
+        btn_students = ctk.CTkButton(
+            button_frame,
+            text="👩‍🎓 Manage Students",
+            command=self.open_students,
+            fg_color="#0b80ff",
+            hover_color="#0066cc",
+            width=250,
+            height=45,
+            corner_radius=10,
+        )
+        btn_students.pack(pady=10)
+
+        btn_courses = ctk.CTkButton(
+            button_frame,
+            text="📗 Manage Courses",
+            command=self.open_courses,
+            fg_color="#2e8b57",
+            hover_color="#256d45",
+            width=250,
+            height=45,
+            corner_radius=10,
+        )
+        btn_courses.pack(pady=10)
+
+        btn_enroll = ctk.CTkButton(
+            button_frame,
+            text="🎓 Enroll Students",
+            command=self.open_enrollments,
+            fg_color="#8a2be2",
+            hover_color="#6a1db9",
+            width=250,
+            height=45,
+            corner_radius=10,
+        )
+        btn_enroll.pack(pady=10)
+
+        btn_attendance = ctk.CTkButton(
+            button_frame,
+            text="🕒 Mark Attendance",
+            command=self.open_attendance,
+            fg_color="#ff8c00",
+            hover_color="#e67300",
+            width=250,
+            height=45,
+            corner_radius=10,
+        )
+        btn_attendance.pack(pady=10)
+
+        btn_reports = ctk.CTkButton(
+            button_frame,
+            text="📊 View Reports",
+            command=self.open_reports,
+            fg_color="#ff4040",
+            hover_color="#cc0000",
+            width=250,
+            height=45,
+            corner_radius=10,
+        )
+        btn_reports.pack(pady=10)
+
+    
+    def open_students(self):
+        try:
+            from students import StudentManager
+            StudentManager()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open Students module:\n{e}")
+
+    def open_courses(self):
+        try:
+            from courses import CourseManager
+            CourseManager()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open Courses module:\n{e}")
+
+    def open_enrollments(self):
+        try:
+            from enroll import EnrollManager
+            EnrollManager()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open Enroll module:\n{e}")
+
+    def open_attendance(self):
+        try:
+            from attendance import AttendanceManager
+            AttendanceManager()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open Attendance module:\n{e}")
+
+    def open_reports(self):
+        try:
+            from reports import ReportManager
+            ReportManager()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open Reports module:\n{e}")
+
+
+ 
+if __name__ == "__main__":
+    app = Dashboard()
+    app.mainloop()
+
+students.py
+
+import customtkinter as ctk
+from tkinter import messagebox
+from db_connection import get_connection
+
+
+# ✅ changed from CTk → CTkToplevel (so it opens as a child window)
+class StudentManager(ctk.CTkToplevel):
+
+    def __init__(self):
+        super().__init__()
+        self.title("Student Management System")
+        self.geometry("900x550")
+
+        # Appearance Settings
+        ctk.set_appearance_mode("dark")  # "light" or "dark"
+        ctk.set_default_color_theme("green")  # "blue", "dark-blue", "green"
+
+        # Background color
+        self.configure(bg="#2C3E50")
+
+        # Title Label
+        title = ctk.CTkLabel(self, text="🎓 College Student Management System",
+                             font=ctk.CTkFont(size=24, weight="bold"),
+                             text_color="#F1C40F")
+        title.pack(pady=20)
+
+        # Main Frame
+        main_frame = ctk.CTkFrame(self, fg_color="#34495E", corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=40, pady=20)
+
+        # Input Fields
+        labels = ["Student ID", "Name", "Department", "Year", "Email", "Phone"]
+        self.entries = {}
+
+        for i, label_text in enumerate(labels):
+            label = ctk.CTkLabel(main_frame, text=label_text + ":", text_color="#ECF0F1")
+            label.grid(row=i, column=0, padx=10, pady=10, sticky="w")
+
+            entry = ctk.CTkEntry(main_frame, placeholder_text=f"Enter {label_text}")
+            entry.grid(row=i, column=1, padx=10, pady=10, sticky="ew")
+            self.entries[label_text.lower().replace(" ", "_")] = entry
+
+        main_frame.columnconfigure(1, weight=1)
+
+        # Button Frame
+        btn_frame = ctk.CTkFrame(main_frame, fg_color="#2C3E50")
+        btn_frame.grid(row=6, column=0, columnspan=2, pady=20)
+
+        ctk.CTkButton(btn_frame, text="Add Student", fg_color="#1ABC9C",
+                      hover_color="#16A085", command=self.add_student).grid(row=0, column=0, padx=15)
+        ctk.CTkButton(btn_frame, text="Update Student", fg_color="#3498DB",
+                      hover_color="#2980B9", command=self.update_student).grid(row=0, column=1, padx=15)
+        ctk.CTkButton(btn_frame, text="Delete Student", fg_color="#E74C3C",
+                      hover_color="#C0392B", command=self.delete_student).grid(row=0, column=2, padx=15)
+        ctk.CTkButton(btn_frame, text="Clear Form", fg_color="#9B59B6",
+                      hover_color="#8E44AD", command=self.clear_form).grid(row=0, column=3, padx=15)
+
+    # ------------------ CRUD Operations ------------------
+
+    def validate_form(self):
+        data = {}
+        for key, entry in self.entries.items():
+            value = entry.get().strip()
+            if not value:
+                messagebox.showwarning("Validation", f"Please enter {key.replace('_', ' ').title()}.")
+                return None
+            data[key] = value
+        return data
+
+    def add_student(self):
+        data = self.validate_form()
+        if not data:
+            return
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO students (student_id, name, department, year, email, phone) VALUES (:1,:2,:3,:4,:5,:6)",
+                    (data['student_id'], data['name'], data['department'], data['year'], data['email'], data['phone'])
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Student added successfully.")
+                self.clear_form()
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Could not add student: {e}")
+
+    def update_student(self):
+        data = self.validate_form()
+        if not data:
+            return
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE students SET name=:1, department=:2, year=:3, email=:4, phone=:5 WHERE student_id=:6",
+                    (data['name'], data['department'], data['year'], data['email'], data['phone'], data['student_id'])
+                )
+                if cur.rowcount == 0:
+                    messagebox.showwarning("Not Found", "No student with that ID exists.")
+                else:
+                    conn.commit()
+                    messagebox.showinfo("Success", "Student updated successfully.")
+                    self.clear_form()
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Could not update student: {e}")
+
+    def delete_student(self):
+        sid = self.entries["student_id"].get().strip()
+        if not sid:
+            messagebox.showwarning("Validation", "Enter Student ID to delete.")
+            return
+        if not messagebox.askyesno("Confirm", "Delete this student? This action cannot be undone."):
+            return
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM students WHERE student_id = :1", (sid,))
+                if cur.rowcount == 0:
+                    messagebox.showwarning("Not Found", "No student with that ID exists.")
+                else:
+                    conn.commit()
+                    messagebox.showinfo("Success", "Student deleted successfully.")
+                    self.clear_form()
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Could not delete student: {e}")
+
+    def clear_form(self):
+        for entry in self.entries.values():
+            entry.delete(0, "end")
+
+
+# ✅ This part is optional — allows standalone testing
+if __name__ == "__main__":
+    app = StudentManager()
+    app.mainloop()
+
+course.py
+
+import customtkinter as ctk
+from tkinter import messagebox
+from db_connection import get_connection
+
+ctk.set_appearance_mode("Dark")  # Unified dark theme
+ctk.set_default_color_theme("blue")
+
+class CourseManager(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Course Management")
+        self.geometry("800x500")
+        self.configure(fg_color="#2C3E50")  # Dark blue background
+
+        # Title
+        ctk.CTkLabel(
+            self,
+            text="Course Management",
+            font=("Arial", 22, "bold"),
+            text_color="#F1C40F"
+        ).pack(pady=20)
+
+        # Outer frame (to center content)
+        outer_frame = ctk.CTkFrame(self, fg_color="#2C3E50")
+        outer_frame.pack(expand=True)  # expands & centers in window
+
+        # Inner form frame
+        form_frame = ctk.CTkFrame(outer_frame, fg_color="#34495E", corner_radius=15)
+        form_frame.pack(padx=20, pady=20)
+
+        # Course ID
+        ctk.CTkLabel(form_frame, text="Course ID:", text_color="#ECF0F1").grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        self.course_id = ctk.CTkEntry(form_frame, placeholder_text="Enter Course ID", width=200)
+        self.course_id.grid(row=0, column=1, padx=10, pady=10)
+
+        # Course Name
+        ctk.CTkLabel(form_frame, text="Course Name:", text_color="#ECF0F1").grid(row=1, column=0, padx=10, pady=10, sticky="e")
+        self.course_name = ctk.CTkEntry(form_frame, placeholder_text="Enter Course Name", width=200)
+        self.course_name.grid(row=1, column=1, padx=10, pady=10)
+
+        # Department
+        ctk.CTkLabel(form_frame, text="Department:", text_color="#ECF0F1").grid(row=2, column=0, padx=10, pady=10, sticky="e")
+        self.department = ctk.CTkEntry(form_frame, placeholder_text="Enter Department", width=200)
+        self.department.grid(row=2, column=1, padx=10, pady=10)
+
+        # Buttons
+        btn_frame = ctk.CTkFrame(form_frame, fg_color="#34495E")
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=20)
+
+        ctk.CTkButton(btn_frame, text="Add Course", fg_color="#1ABC9C", hover_color="#16A085",
+                      command=self.add_course, width=130).grid(row=0, column=0, padx=10)
+        ctk.CTkButton(btn_frame, text="Update Course", fg_color="#F39C12", hover_color="#D68910",
+                      command=self.update_course, width=130).grid(row=0, column=1, padx=10)
+        ctk.CTkButton(btn_frame, text="Delete Course", fg_color="#E74C3C", hover_color="#C0392B",
+                      command=self.delete_course, width=130).grid(row=0, column=2, padx=10)
+        ctk.CTkButton(btn_frame, text="Clear Fields", fg_color="#5DADE2", hover_color="#3498DB",
+                      command=self.clear_fields, width=130).grid(row=0, column=3, padx=10)
+
+    # Database Operations
+    def add_course(self):
+        cid = self.course_id.get().strip()
+        name = self.course_name.get().strip()
+        dept = self.department.get().strip()
+
+        if not cid or not name or not dept:
+            messagebox.showwarning("Validation", "All fields are required!")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO courses (course_id, course_name, department) VALUES (:1, :2, :3)",
+                    (cid, name, dept)
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Course added successfully.")
+                self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def update_course(self):
+        cid = self.course_id.get().strip()
+        name = self.course_name.get().strip()
+        dept = self.department.get().strip()
+
+        if not cid:
+            messagebox.showwarning("Validation", "Enter Course ID to update.")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""UPDATE courses SET course_name=:1, department=:2 WHERE course_id=:3""",
+                            (name, dept, cid))
+                conn.commit()
+                messagebox.showinfo("Success", "Course updated successfully.")
+                self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def delete_course(self):
+        cid = self.course_id.get().strip()
+        if not cid:
+            messagebox.showwarning("Validation", "Enter Course ID to delete.")
+            return
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM courses WHERE course_id=:1", (cid,))
+                conn.commit()
+                messagebox.showinfo("Deleted", "Course deleted successfully.")
+                self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def clear_fields(self):
+        self.course_id.delete(0, "end")
+        self.course_name.delete(0, "end")
+        self.department.delete(0, "end")
+
+
+if __name__ == "__main__":
+    app = CourseManager()
+    app.mainloop()  
+
+enrollments.py
+import customtkinter as ctk
+from tkinter import messagebox
+from db_connection import get_connection
+
+ctk.set_appearance_mode("Dark")  # Unified dark theme
+ctk.set_default_color_theme("blue")
+
+
+class EnrollManager(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Student Enrollment")
+        self.geometry("800x500")
+        self.configure(fg_color="#2C3E50")  # Same as courses.py background
+
+        # Title
+        ctk.CTkLabel(
+            self,
+            text="🎓 Student Enrollment",
+            font=("Arial", 22, "bold"),
+            text_color="#F1C40F"  # Golden title
+        ).pack(pady=20)
+
+        # Outer frame (center content)
+        outer_frame = ctk.CTkFrame(self, fg_color="#2C3E50")
+        outer_frame.pack(expand=True)
+
+        # Inner frame (form)
+        form_frame = ctk.CTkFrame(outer_frame, fg_color="#34495E", corner_radius=15)
+        form_frame.pack(padx=20, pady=20)
+
+        # --- Enrollment ID ---
+        ctk.CTkLabel(form_frame, text="Enrollment ID:", text_color="#ECF0F1").grid(
+            row=0, column=0, padx=10, pady=10, sticky="e"
+        )
+        self.enroll_id = ctk.CTkEntry(form_frame, placeholder_text="Enter Enrollment ID", width=200)
+        self.enroll_id.grid(row=0, column=1, padx=10, pady=10)
+
+        # --- Student ID ---
+        ctk.CTkLabel(form_frame, text="Student ID:", text_color="#ECF0F1").grid(
+            row=1, column=0, padx=10, pady=10, sticky="e"
+        )
+        self.student_id = ctk.CTkEntry(form_frame, placeholder_text="Enter Student ID", width=200)
+        self.student_id.grid(row=1, column=1, padx=10, pady=10)
+
+        # --- Course ID ---
+        ctk.CTkLabel(form_frame, text="Course ID:", text_color="#ECF0F1").grid(
+            row=2, column=0, padx=10, pady=10, sticky="e"
+        )
+        self.course_id = ctk.CTkEntry(form_frame, placeholder_text="Enter Course ID", width=200)
+        self.course_id.grid(row=2, column=1, padx=10, pady=10)
+
+        # Buttons Frame
+        btn_frame = ctk.CTkFrame(form_frame, fg_color="#34495E")
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=20)
+
+        # --- Buttons ---
+        ctk.CTkButton(btn_frame, text="Add Enrollment",
+                      fg_color="#1ABC9C", hover_color="#16A085",
+                      command=self.add_enrollment, width=130).grid(row=0, column=0, padx=10)
+
+        ctk.CTkButton(btn_frame, text="Update Enrollment",
+                      fg_color="#F39C12", hover_color="#D68910",
+                      command=self.update_enrollment, width=130).grid(row=0, column=1, padx=10)
+
+        ctk.CTkButton(btn_frame, text="Delete Enrollment",
+                      fg_color="#E74C3C", hover_color="#C0392B",
+                      command=self.delete_enrollment, width=130).grid(row=0, column=2, padx=10)
+
+        ctk.CTkButton(btn_frame, text="Clear Fields",
+                      fg_color="#5DADE2", hover_color="#3498DB",
+                      command=self.clear_fields, width=130).grid(row=0, column=3, padx=10)
+
+    # ---------------- Database Operations ----------------
+    def add_enrollment(self):
+        eid = self.enroll_id.get().strip()
+        sid = self.student_id.get().strip()
+        cid = self.course_id.get().strip()
+
+        if not eid or not sid or not cid:
+            messagebox.showwarning("Validation", "All fields are required!")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO enrollments (enrollment_id, student_id, course_id) VALUES (:1, :2, :3)",
+                    (eid, sid, cid)
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Enrollment added successfully.")
+                self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def update_enrollment(self):
+        eid = self.enroll_id.get().strip()
+        sid = self.student_id.get().strip()
+        cid = self.course_id.get().strip()
+
+        if not eid:
+            messagebox.showwarning("Validation", "Enter Enrollment ID to update.")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE enrollments SET student_id=:1, course_id=:2 WHERE enrollment_id=:3",
+                    (sid, cid, eid)
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Enrollment updated successfully.")
+                self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def delete_enrollment(self):
+        eid = self.enroll_id.get().strip()
+
+        if not eid:
+            messagebox.showwarning("Validation", "Enter Enrollment ID to delete.")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM enrollments WHERE enrollment_id=:1", (eid,))
+                conn.commit()
+                messagebox.showinfo("Deleted", "Enrollment deleted successfully.")
+                self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def clear_fields(self):
+        self.enroll_id.delete(0, "end")
+        self.student_id.delete(0, "end")
+        self.course_id.delete(0, "end")
+
+
+if __name__ == "__main__":
+    app = EnrollManager()
+    app.mainloop()
+
+
+attendance.py
+
+import customtkinter as ctk
+from tkinter import ttk, messagebox
+from db_connection import get_connection
+from datetime import date
+
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
+
+
+class AttendanceManager(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Attendance Management")
+        self.geometry("1000x600")
+        self.configure(fg_color="#2C3E50")  # Dark blue theme
+
+        # Title
+        ctk.CTkLabel(
+            self,
+            text="🕒 Attendance Management",
+            font=("Arial", 24, "bold"),
+            text_color="#F1C40F"
+        ).pack(pady=15)
+
+        # Main Frame
+        self.main_frame = ctk.CTkFrame(self, corner_radius=15, fg_color="#34495E")
+        self.main_frame.place(relx=0.02, rely=0.08, relwidth=0.96, relheight=0.9)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # Top Frame
+        top_frame = ctk.CTkFrame(self.main_frame, fg_color="#2C3E50", corner_radius=15)
+        top_frame.pack(pady=10, padx=10, fill="x")
+
+        ctk.CTkLabel(top_frame, text="Course:", text_color="white").grid(row=0, column=0, padx=10, pady=10)
+        self.course_var = ctk.CTkComboBox(top_frame, values=self.load_courses(), width=200)
+        self.course_var.grid(row=0, column=1, padx=10)
+
+        ctk.CTkLabel(top_frame, text="Date:", text_color="white").grid(row=0, column=2, padx=10)
+        self.date_entry = ctk.CTkEntry(top_frame, width=150)
+        self.date_entry.grid(row=0, column=3, padx=10)
+        self.date_entry.insert(0, date.today().strftime("%Y-%m-%d"))
+
+        ctk.CTkButton(top_frame, text="Load Students", command=self.load_students,
+                      fg_color="#1ABC9C", hover_color="#16A085", width=150).grid(row=0, column=4, padx=10)
+
+        # Table Frame
+        table_frame = ctk.CTkFrame(self.main_frame, fg_color="#2C3E50", corner_radius=15)
+        table_frame.pack(pady=10, padx=10, fill="both", expand=True)
+
+        self.tree = ttk.Treeview(table_frame, columns=("ID", "Name", "Status"), show="headings")
+        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for col in ("ID", "Name", "Status"):
+            self.tree.heading(col, text=col)
+            self.tree.column(col, anchor="center", width=200)
+
+        style = ttk.Style()
+        style.configure("Treeview", background="#34495E", foreground="white",
+                        fieldbackground="#34495E", rowheight=28, font=("Arial", 11))
+        style.map('Treeview', background=[('selected', '#2980B9')])
+
+        # Bottom Buttons
+        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#2C3E50", corner_radius=15)
+        btn_frame.pack(pady=10)
+
+        ctk.CTkButton(btn_frame, text="Mark Present", fg_color="#27AE60", hover_color="#1E8449",
+                      command=lambda: self.mark_attendance("Present")).grid(row=0, column=0, padx=10, pady=10)
+
+        ctk.CTkButton(btn_frame, text="Mark Absent", fg_color="#E74C3C", hover_color="#C0392B",
+                      command=lambda: self.mark_attendance("Absent")).grid(row=0, column=1, padx=10, pady=10)
+
+        ctk.CTkButton(btn_frame, text="Save Attendance", fg_color="#3498DB", hover_color="#2E86C1",
+                      command=self.save_attendance).grid(row=0, column=2, padx=10, pady=10)
+
+        ctk.CTkButton(btn_frame, text="Clear", fg_color="#7F8C8D", hover_color="#707B7C",
+                      command=self.clear_selection).grid(row=0, column=3, padx=10, pady=10)
+
+    def load_courses(self):
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT course_name FROM courses ORDER BY course_id")
+                return [row[0] for row in cur]
+        except Exception as e:
+            messagebox.showerror("DB Error", str(e))
+        return []
+
+    def load_students(self):
+        self.tree.delete(*self.tree.get_children())
+        course = self.course_var.get()
+        if not course:
+            messagebox.showwarning("Select Course", "Please select a course.")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT s.student_id, s.name
+                    FROM students s
+                    JOIN enrollments e ON s.student_id = e.student_id
+                    JOIN courses c ON e.course_id = c.course_id
+                    WHERE c.course_name = :course_name
+                """, {"course_name": course})
+                students = cur.fetchall()
+                if not students:
+                    messagebox.showinfo("No Students", "No students found for this course.")
+                    return
+                for row in students:
+                    self.tree.insert("", "end", values=(row[0], row[1], "Absent"))
+        except Exception as e:
+            messagebox.showerror("DB Error", str(e))
+
+    def mark_attendance(self, status):
+        for item in self.tree.selection():
+            self.tree.set(item, "Status", status)
+
+    def save_attendance(self):
+        course = self.course_var.get()
+        adate = self.date_entry.get().strip()
+        if not course or not adate:
+            messagebox.showwarning("Validation", "Course and date required")
+            return
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                
+                # Get course_id
+                cur.execute("SELECT course_id FROM courses WHERE course_name=:course_name", {"course_name": course})
+                result = cur.fetchone()
+                if not result:
+                    messagebox.showerror("Error", "Selected course not found in database")
+                    return
+                course_id = result[0]
+
+                # Save attendance for each student
+                for item in self.tree.get_children():
+                    student_id, _, status = self.tree.item(item, "values")
+                    cur.execute("""
+                        MERGE INTO attendance a
+                        USING dual
+                        ON (
+                            a.student_id = :student_id 
+                            AND a.course_id = :course_id 
+                            AND a.attendance_date = TO_DATE(:adate,'YYYY-MM-DD')
+                        )
+                        WHEN MATCHED THEN 
+                            UPDATE SET a.status = :status
+                        WHEN NOT MATCHED THEN 
+                            INSERT (student_id, course_id, attendance_date, status)
+                            VALUES (:student_id, :course_id, TO_DATE(:adate,'YYYY-MM-DD'), :status)
+                    """, {
+                        "student_id": student_id,
+                        "course_id": course_id,
+                        "adate": adate,
+                        "status": status
+                    })
+                conn.commit()
+            messagebox.showinfo("Success", "Attendance Saved Successfully ✅")
+        except Exception as e:
+            messagebox.showerror("DB Error", str(e))
+
+    def clear_selection(self):
+        for item in self.tree.get_children():
+            self.tree.set(item, "Status", "Absent")
+
+
+if __name__ == "__main__":
+    app = AttendanceManager()
+    app.mainloop()
+
+reports.py
+
+# reports.py
+import customtkinter as ctk
+from tkinter import ttk, messagebox
+from db_connection import get_connection
+
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
+
+
+class ReportsManager(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Attendance Reports")
+        self.geometry("1000x600")
+        self.configure(fg_color="#2C3E50")  # Same dark blue theme
+
+        # -------------------- Main Frame --------------------
+        self.main_frame = ctk.CTkFrame(self, corner_radius=20, fg_color="#34495E")
+        self.main_frame.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # -------------------- Top Frame --------------------
+        top_frame = ctk.CTkFrame(self.main_frame, corner_radius=15, fg_color="#2C3E50")
+        top_frame.pack(pady=10, padx=10, fill="x")
+
+        ctk.CTkLabel(top_frame, text="Select Course:", font=("Arial", 15), text_color="white") \
+            .grid(row=0, column=0, padx=15, pady=10, sticky="w")
+
+        self.course_var = ctk.CTkComboBox(top_frame, values=self.load_courses(), width=250)
+        self.course_var.grid(row=0, column=1, padx=10, pady=10)
+
+        ctk.CTkButton(top_frame, text="Generate Report", command=self.generate_report,
+                      fg_color="#3498DB", hover_color="#2E86C1", font=("Arial", 14),
+                      width=200).grid(row=0, column=2, padx=20, pady=10)
+
+        # -------------------- Table Frame --------------------
+        table_frame = ctk.CTkFrame(self.main_frame, corner_radius=15, fg_color="#2C3E50")
+        table_frame.pack(pady=10, padx=10, fill="both", expand=True)
+
+        columns = ("ID", "Name", "Total Classes", "Present", "Attendance %")
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for col in columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, anchor="center", width=150)
+
+        style = ttk.Style()
+        style.configure("Treeview", background="#34495E", foreground="white",
+                        fieldbackground="#34495E", font=("Arial", 11), rowheight=28)
+        style.map("Treeview", background=[("selected", "#2980B9")], foreground=[("selected", "white")])
+
+    # -------------------- Load Courses --------------------
+    def load_courses(self):
+        courses = []
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT course_name FROM courses ORDER BY course_id")
+                courses = [row[0] for row in cur]
+        except Exception as e:
+            messagebox.showerror("DB Error", f"Could not load courses: {e}")
+        return courses
+
+    # -------------------- Generate Report --------------------
+    def generate_report(self):
+        selected_course = self.course_var.get()
+        if not selected_course:
+            messagebox.showwarning("Validation", "Please select a course.")
+            return
+
+        # Clear previous rows
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        try:
+            with get_connection() as conn:
+                cur = conn.cursor()
+
+                # Get course_id
+                cur.execute("SELECT course_id FROM courses WHERE course_name=:course_name",
+                            {"course_name": selected_course})
+                course_row = cur.fetchone()
+                if not course_row:
+                    messagebox.showerror("Error", "Selected course not found")
+                    return
+                course_id = course_row[0]
+
+                # Get students enrolled in this course
+                cur.execute("""
+                    SELECT s.student_id, s.name
+                    FROM students s
+                    JOIN enrollments e ON s.student_id = e.student_id
+                    WHERE e.course_id = :course_id
+                """, {"course_id": course_id})
+                students = cur.fetchall()
+
+                for student_id, name in students:
+                    # Total classes
+                    cur.execute("SELECT COUNT(*) FROM attendance WHERE student_id=:student_id AND course_id=:course_id",
+                                {"student_id": student_id, "course_id": course_id})
+                    total_classes = cur.fetchone()[0]
+
+                    # Total present
+                    cur.execute("""SELECT COUNT(*) FROM attendance 
+                                   WHERE student_id=:student_id AND course_id=:course_id AND status='Present'""",
+                                {"student_id": student_id, "course_id": course_id})
+                    present = cur.fetchone()[0]
+
+                    percentage = (present / total_classes * 100) if total_classes > 0 else 0
+                    self.tree.insert("", "end",
+                                     values=(student_id, name, total_classes, present, f"{percentage:.2f}%"))
+
+        except Exception as e:
+            messagebox.showerror("DB Error", f"Could not generate report: {e}")
+
+
+if __name__ == "__main__":
+    app = ReportsManager()
+    app.mainloop()
+
+schema.sql
+-- Students Table
+CREATE TABLE students (
+    student_id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name VARCHAR2(25),
+    department VARCHAR2(25),
+    year VARCHAR2(10),
+    email VARCHAR2(25),
+    phone VARCHAR2(15)
+);
+
+-- Courses Table
+CREATE TABLE courses (
+    course_id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    course_name VARCHAR2(50),
+    department VARCHAR2(25)
+);
+
+-- Enrollments Table
+CREATE TABLE enrollments (
+    enrollment_id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    student_id NUMBER REFERENCES students(student_id),
+    course_id NUMBER REFERENCES courses(course_id)
+);
+
+-- Attendance Table
+CREATE TABLE attendance (
+    attendance_id   NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY,
+    student_id      NUMBER NOT NULL,
+    course_id       NUMBER NOT NULL,
+    attendance_date DATE NOT NULL,
+    status          VARCHAR2(10) CHECK (status IN ('Present', 'Absent')),
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students(student_id),
+    CONSTRAINT fk_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
+    CONSTRAINT uc_attendance UNIQUE (student_id, course_id, attendance_date)
+);
+
